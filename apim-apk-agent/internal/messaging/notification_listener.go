@@ -403,14 +403,14 @@ func handleSubscriptionEvents(data []byte, eventType string) {
 	}
 
 	// Debug logging to track the raw subscription event data
-	logger.LoggerMessaging.Infof("Raw subscription event data: %s", string(data))
-	logger.LoggerMessaging.Infof("Parsed subscription event - UUID: %s, PolicyID: '%s', TierName: '%s', ThrottlingPolicy: '%s', TenantDomain: '%s', APIName: %s, APIVersion: %s",
+	logger.LoggerMessaging.Debugf("Raw subscription event data: %s", string(data))
+	logger.LoggerMessaging.Debugf("Parsed subscription event - UUID: %s, PolicyID: '%s', TierName: '%s', ThrottlingPolicy: '%s', TenantDomain: '%s', APIName: %s, APIVersion: %s",
 		subscriptionEvent.SubscriptionUUID, subscriptionEvent.PolicyID, subscriptionEvent.TierName,
 		subscriptionEvent.ThrottlingPolicy, subscriptionEvent.TenantDomain,
 		subscriptionEvent.APIName, subscriptionEvent.APIVersion)
 
 	if !belongsToTenant(subscriptionEvent.TenantDomain) {
-		logger.LoggerMessaging.Infof("Subscription event for the Application : %s and API %s is dropped due to having non related tenantDomain : %s",
+		logger.LoggerMessaging.Debugf("Subscription event for the Application : %s and API %s is dropped due to having non related tenantDomain : %s",
 			subscriptionEvent.ApplicationUUID, subscriptionEvent.APIUUID, subscriptionEvent.TenantDomain)
 		return
 	}

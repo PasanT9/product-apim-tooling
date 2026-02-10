@@ -597,7 +597,7 @@ func DeployAIRateLimitPolicyFromCPPolicy(policy eventhubTypes.SubscriptionPolicy
 // UnDeploySubscriptionRateLimitPolicyCR applies the given RateLimitPolicies struct to the Kubernetes cluster.
 func UnDeploySubscriptionRateLimitPolicyCR(crName string, k8sClient client.Client) {
 	conf, _ := config.ReadConfigs()
-	crRateLimitPolicies := &dpv1alpha1.RateLimitPolicy{}
+	crRateLimitPolicies := &dpv1alpha3.RateLimitPolicy{}
 	if err := k8sClient.Get(context.Background(), client.ObjectKey{Namespace: conf.DataPlane.Namespace, Name: crName}, crRateLimitPolicies); err != nil {
 		loggers.LoggerK8sClient.Error("Unable to get RateLimitPolicies CR: " + err.Error())
 	}
