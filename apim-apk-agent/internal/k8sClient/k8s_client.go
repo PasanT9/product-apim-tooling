@@ -455,16 +455,16 @@ func UpdateRateLimitPolicyCR(policy eventhubTypes.RateLimitPolicy, k8sClient cli
 }
 
 // DeploySubscriptionRateLimitPolicyCR applies the given RateLimitPolicies struct to the Kubernetes cluster.
-func DeploySubscriptionRateLimitPolicyCR(policy eventhubTypes.SubscriptionPolicy, k8sClient client.Client) {
+func DeploySubscriptionRateLimitPolicyCR(subscriptionRLPolicy eventhubTypes.SubscriptionPolicy, k8sClient client.Client) {
 	conf, _ := config.ReadConfigs()
-	crRateLimitPolicy := dpv1alpha3.RateLimitPolicy{}
-	crName := PrepareSubscritionPolicyCRName(policy.Name, policy.TenantDomain)
+	rateLimitPolicyCR := dpv1alpha3.RateLimitPolicy{}
+	crName := PrepareRateLimitPolicyCRName(subscriptionRLPolicy.Name, subscriptionRLPolicy.TenantDomain)
 	labelMap := map[string]string{
 		"InitiateFrom": "CP",
-		"CPName":       policy.Name,
+		"CPName":       subscriptionRLPolicy.Name,
 	}
-	if err := k8sClient.Get(context.Background(), client.ObjectKey{Namespace: conf.DataPlane.Namespace, Name: crName}, &crRateLimitPolicy); err != nil {
-		crRateLimitPolicy = dpv1alpha3.RateLimitPolicy{
+	if err := k8sClient.Get(context.Background(), client.ObjectKey{Namespace: conf.DataPlane.Namespace, Name: crName}, &rateLimitPolicyCR); err != nil {
+		rateLimitPolicyCR = dpv1alpha3.RateLimitPolicy{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      crName,
 				Namespace: conf.DataPlane.Namespace,
@@ -473,46 +473,55 @@ func DeploySubscriptionRateLimitPolicyCR(policy eventhubTypes.SubscriptionPolicy
 			Spec: dpv1alpha3.RateLimitPolicySpec{
 				Override: &dpv1alpha3.RateLimitAPIPolicy{
 					Subscription: &dpv1alpha3.SubscriptionRateLimitPolicy{
-						StopOnQuotaReach: policy.StopOnQuotaReach,
-						Organization:     policy.TenantDomain,
+						StopOnQuotaReach: subscriptionRLPolicy.StopOnQuotaReach,
+						Organization:     subscriptionRLPolicy.TenantDomain,
 						RequestCount: &dpv1alpha3.RequestCount{
-							RequestsPerUnit: uint32(policy.DefaultLimit.RequestCount.RequestCount),
-							Unit:            policy.DefaultLimit.RequestCount.TimeUnit,
+							RequestsPerUnit: uint32(subscriptionRLPolicy.DefaultLimit.RequestCount.RequestCount),
+							Unit:            subscriptionRLPolicy.DefaultLimit.RequestCount.TimeUnit,
 						},
 						BurstControl: &dpv1alpha3.BurstControl{
-							RequestsPerUnit: uint32(policy.RateLimitCount),
-							Unit:            policy.RateLimitTimeUnit,
+							RequestsPerUnit: uint32(subscriptionRLPolicy.RateLimitCount),
+							Unit:            subscriptionRLPolicy.RateLimitTimeUnit,
 						},
 					},
 				},
-				TargetRef: gwapiv1b1.NamespacedPolicyTargetReference{Group: constants.GatewayGroup, Kind: "Subscription", Name: "default"},
+				TargetRef: gwapiv1b1.NamespacedPolicyTargetReference{
+					Group: constants.GatewayGroup,
+					Kind:  "Subscription",
+					Name:  "default",
+				},
 			},
 		}
-		if err := k8sClient.Create(context.Background(), &crRateLimitPolicy); err != nil {
-			loggers.LoggerK8sClient.Error("Unable to create RateLimitPolicies CR: " + err.Error())
+		if err := k8sClient.Create(context.Background(), &rateLimitPolicyCR); err != nil {
+			loggers.LoggerK8sClient.Error("Unable to create SubscriptionRateLimitPolicies CR: " + err.Error())
 		} else {
-			loggers.LoggerK8sClient.Info("RateLimitPolicies CR created: " + crRateLimitPolicy.Name)
+			loggers.LoggerK8sClient.Info("Subscription RateLimitPolicies CR created: " + rateLimitPolicyCR.Name)
 		}
 	} else {
-		crRateLimitPolicy.Spec.Override.Subscription.StopOnQuotaReach = policy.StopOnQuotaReach
-		crRateLimitPolicy.Spec.Override.Subscription.Organization = policy.TenantDomain
-		if crRateLimitPolicy.Spec.Override.Subscription.RequestCount == nil {
-			crRateLimitPolicy.Spec.Override.Subscription.RequestCount = &dpv1alpha3.RequestCount{}
+		if rateLimitPolicyCR.Spec.Override == nil {
+			rateLimitPolicyCR.Spec.Override = &dpv1alpha3.RateLimitAPIPolicy{}
 		}
-		crRateLimitPolicy.Spec.Override.Subscription.RequestCount.RequestsPerUnit = uint32(policy.DefaultLimit.RequestCount.RequestCount)
-		crRateLimitPolicy.Spec.Override.Subscription.RequestCount.Unit = policy.DefaultLimit.RequestCount.TimeUnit
-		if crRateLimitPolicy.Spec.Override.Subscription.BurstControl == nil {
-			crRateLimitPolicy.Spec.Override.Subscription.BurstControl = &dpv1alpha3.BurstControl{}
+		if rateLimitPolicyCR.Spec.Override.Subscription == nil {
+			rateLimitPolicyCR.Spec.Override.Subscription = &dpv1alpha3.SubscriptionRateLimitPolicy{}
 		}
-		crRateLimitPolicy.Spec.Override.Subscription.BurstControl.RequestsPerUnit = uint32(policy.RateLimitCount)
-		crRateLimitPolicy.Spec.Override.Subscription.BurstControl.Unit = policy.RateLimitTimeUnit
-		if err := k8sClient.Update(context.Background(), &crRateLimitPolicy); err != nil {
-			loggers.LoggerK8sClient.Error("Unable to update RateLimitPolicies CR: " + err.Error())
+		rateLimitPolicyCR.Spec.Override.Subscription.StopOnQuotaReach = subscriptionRLPolicy.StopOnQuotaReach
+		rateLimitPolicyCR.Spec.Override.Subscription.Organization = subscriptionRLPolicy.TenantDomain
+		if rateLimitPolicyCR.Spec.Override.Subscription.RequestCount == nil {
+			rateLimitPolicyCR.Spec.Override.Subscription.RequestCount = &dpv1alpha3.RequestCount{}
+		}
+		rateLimitPolicyCR.Spec.Override.Subscription.RequestCount.RequestsPerUnit = uint32(subscriptionRLPolicy.DefaultLimit.RequestCount.RequestCount)
+		rateLimitPolicyCR.Spec.Override.Subscription.RequestCount.Unit = subscriptionRLPolicy.DefaultLimit.RequestCount.TimeUnit
+		if rateLimitPolicyCR.Spec.Override.Subscription.BurstControl == nil {
+			rateLimitPolicyCR.Spec.Override.Subscription.BurstControl = &dpv1alpha3.BurstControl{}
+		}
+		rateLimitPolicyCR.Spec.Override.Subscription.BurstControl.RequestsPerUnit = uint32(subscriptionRLPolicy.RateLimitCount)
+		rateLimitPolicyCR.Spec.Override.Subscription.BurstControl.Unit = subscriptionRLPolicy.RateLimitTimeUnit
+		if err := k8sClient.Update(context.Background(), &rateLimitPolicyCR); err != nil {
+			loggers.LoggerK8sClient.Error("Unable to update RateLimitPolicies CR for subscription level: " + err.Error())
 		} else {
-			loggers.LoggerK8sClient.Info("RateLimitPolicies CR updated: " + crRateLimitPolicy.Name)
+			loggers.LoggerK8sClient.Info("RateLimitPolicies CR updated for subscription level: " + rateLimitPolicyCR.Name)
 		}
 	}
-
 }
 
 // DeployAIRateLimitPolicyFromCPPolicy applies the given AIRateLimitPolicies struct to the Kubernetes cluster.
@@ -547,7 +556,7 @@ func DeployAIRateLimitPolicyFromCPPolicy(policy eventhubTypes.SubscriptionPolicy
 
 	crRateLimitPolicies := dpv1alpha3.AIRateLimitPolicy{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      PrepareSubscritionPolicyCRName(policy.Name, policy.TenantDomain),
+			Name:      PrepareRateLimitPolicyCRName(policy.Name, policy.TenantDomain),
 			Namespace: conf.DataPlane.Namespace,
 			Labels:    labelMap,
 		},
@@ -557,7 +566,11 @@ func DeployAIRateLimitPolicyFromCPPolicy(policy eventhubTypes.SubscriptionPolicy
 				TokenCount:   tokenCount,
 				RequestCount: requestCount,
 			},
-			TargetRef: gwapiv1b1.NamespacedPolicyTargetReference{Group: constants.GatewayGroup, Kind: "Subscription", Name: "default"},
+			TargetRef: gwapiv1b1.NamespacedPolicyTargetReference{
+				Group: constants.GatewayGroup,
+				Kind:  "Subscription",
+				Name:  "default",
+			},
 		},
 	}
 	crRateLimitPolicyFetched := &dpv1alpha3.AIRateLimitPolicy{}
@@ -584,7 +597,7 @@ func DeployAIRateLimitPolicyFromCPPolicy(policy eventhubTypes.SubscriptionPolicy
 // UnDeploySubscriptionRateLimitPolicyCR applies the given RateLimitPolicies struct to the Kubernetes cluster.
 func UnDeploySubscriptionRateLimitPolicyCR(crName string, k8sClient client.Client) {
 	conf, _ := config.ReadConfigs()
-	crRateLimitPolicies := &dpv1alpha1.RateLimitPolicy{}
+	crRateLimitPolicies := &dpv1alpha3.RateLimitPolicy{}
 	if err := k8sClient.Get(context.Background(), client.ObjectKey{Namespace: conf.DataPlane.Namespace, Name: crName}, crRateLimitPolicies); err != nil {
 		loggers.LoggerK8sClient.Error("Unable to get RateLimitPolicies CR: " + err.Error())
 	}
@@ -701,7 +714,7 @@ func CreateAndUpdateTokenIssuersCR(keyManager eventhubTypes.ResolvedKeyManager, 
 			SignatureValidation: &dpv1alpha2.SignatureValidation{
 				Certificate: &dpv1alpha2.CERTConfig{
 					SecretRef: &dpv1alpha2.RefConfig{
-						Name: constants.InternalKeySecretName,
+						Name: conf.ControlPlane.InternalKeySecret,
 						Key:  constants.InternalKeySecretKey,
 					},
 				},
@@ -967,7 +980,7 @@ func RetrieveAllAIRatelimitPoliciesSFromK8s(k8sClient client.Client, nextToken s
 	return resolvedAIRLList, airlList.Continue, nil
 }
 
-// PrepareSubscritionPolicyCRName prepare the cr name for a given policy name and organization pair
-func PrepareSubscritionPolicyCRName(name, org string) string {
+// PrepareRateLimitPolicyCRName prepares the CR name for a given policy name and organization pair
+func PrepareRateLimitPolicyCRName(name, org string) string {
 	return getSha1Value(fmt.Sprintf("%s-%s", name, org))
 }
