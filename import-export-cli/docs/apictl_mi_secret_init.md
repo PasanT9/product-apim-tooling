@@ -7,7 +7,7 @@ Initialize secret encryption
 Initialize the key store or symmetric encryption key required for secret encryption
 
 ```
-apictl mi secret init [symmetric]
+apictl mi secret init [symmetric] [flags]
 ```
 
 ### Examples
