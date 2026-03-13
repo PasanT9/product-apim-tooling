@@ -1,21 +1,23 @@
 ## apictl secret init
 
-Initialize Key Store
+Initialize secret encryption
 
 ### Synopsis
 
-Initialize the Key Store information required for secret encryption
+Initialize the key store or symmetric encryption key required for secret encryption
 
 ```
-apictl secret init [flags]
+apictl secret init [symmetric] [flags]
 ```
 
 ### Examples
 
 ```
 To initialize a Key Store information
-  apictl mi secret init
-NOTE: Secret encryption supports only JKS Key Stores
+  apictl secret init
+To initialize a symmetric encryption key
+  apictl secret init symmetric
+NOTE: Asymmetric secret encryption supports only JKS Key Stores
 ```
 
 ### Options

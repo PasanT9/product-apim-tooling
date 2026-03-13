@@ -25,7 +25,8 @@ import (
 
 const secretCmdLiteral = "secret"
 const secretCmdShortDesc = "Manage sensitive information"
-
+const symmetricModeLiteral = "symmetric"
+const cipherFlagLiteral = "cipher"
 const secretCmdLongDesc = "Encrypt secrets to be used in the Micro Integrator"
 
 // SecretCmd represents the secret command

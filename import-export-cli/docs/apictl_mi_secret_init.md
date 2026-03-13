@@ -1,13 +1,13 @@
 ## apictl mi secret init
 
-Initialize keystore
+Initialize secret encryption
 
 ### Synopsis
 
-Initialize the key store information required for secret encryption
+Initialize the key store or symmetric encryption key required for secret encryption
 
 ```
-apictl mi secret init [flags]
+apictl mi secret init [symmetric]
 ```
 
 ### Examples
@@ -15,6 +15,8 @@ apictl mi secret init [flags]
 ```
 To initialize keystore information
   apictl mi secret init
+To initialize a symmetric encryption key
+  apictl mi secret init symmetric
 ```
 
 ### Options
@@ -33,4 +35,3 @@ To initialize keystore information
 ### SEE ALSO
 
 * [apictl mi secret](apictl_mi_secret.md)	 - Manage sensitive information
-

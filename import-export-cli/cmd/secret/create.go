@@ -42,6 +42,8 @@ const secretCreateCmdLongDesc = "Create secrets based on given arguments"
 
 var secretCreateCmdExamples = "To encrypt secret and get output on console\n" +
 	"  " + utils.ProjectName + " " + secretCmdLiteral + " " + secretCreateCmdLiteral + "\n" +
+	"To encrypt secret using an initialized symmetric encryption key and get output on console\n" +
+	"  " + utils.ProjectName + " " + secretCmdLiteral + " " + secretCreateCmdLiteral + " " + symmetricModeLiteral + "\n" +
 	"To encrypt secret and get output as a .properties file (stored in the security folder in apictl executable directory)\n" +
 	"  " + utils.ProjectName + " " + secretCmdLiteral + " " + secretCreateCmdLiteral + " -o file\n" +
 	"To encrypt secret and get output as a .yaml file (stored in the security folder in apictl executable directory)\n" +
@@ -52,21 +54,37 @@ var secretCreateCmdExamples = "To encrypt secret and get output on console\n" +
 	"  " + utils.ProjectName + " " + secretCmdLiteral + " " + secretCreateCmdLiteral + " -o k8 -f <file_path>"
 
 var secretCreateCmd = &cobra.Command{
-	Use:     secretCreateCmdLiteral,
+	Use:     secretCreateCmdLiteral + " [" + symmetricModeLiteral + "]",
 	Short:   secretCreateCmdShortDesc,
 	Long:    secretCreateCmdLongDesc,
 	Example: secretCreateCmdExamples,
-	Args:    cobra.NoArgs,
+	Args:    validateSymmetricModeCreateArg,
 	Run: func(cmd *cobra.Command, args []string) {
-		keyStoreConfig, err := utils.GetKeyStoreConfigFromFile(utils.GetKeyStoreConfigFilePath())
-		if err != nil {
-			utils.HandleErrorAndExit("Key Store has not been initialized.", err)
-		}
-		err = validateFlags()
+		resolveCreateCipher(cmd, args)
+		err := validateFlags()
 		if err != nil {
 			utils.HandleErrorAndExit("Invalid flag", err)
 		}
-		initSecretInformation(keyStoreConfig)
+		var keyStoreConfig *utils.KeyStoreConfig
+		var encryptionKeyConfig *utils.EncryptionKeyConfig
+		if utils.IsAES256Encryption(encryptionAlgorithm) {
+			encryptionKeyConfig, err = utils.GetEncryptionKeyConfigFromFile(utils.GetEncryptionKeyConfigFilePath())
+			if err != nil {
+				utils.HandleErrorAndExit("Encryption key has not been initialized.", err)
+			}
+			if encryptionKeyConfig == nil || !utils.IsValidSymmetricEncryptionConfig(encryptionKeyConfig) {
+				utils.HandleErrorAndExit("Encryption key has not been initialized.", nil)
+			}
+		} else {
+			keyStoreConfig, err = utils.GetKeyStoreConfigFromFile(utils.GetKeyStoreConfigFilePath())
+			if err != nil {
+				utils.HandleErrorAndExit("Key Store has not been initialized.", err)
+			}
+			if keyStoreConfig == nil || !utils.IsValidKeyStoreConfig(keyStoreConfig) {
+				utils.HandleErrorAndExit("Key Store has not been initialized.", nil)
+			}
+		}
+		initSecretInformation(keyStoreConfig, encryptionKeyConfig)
 	},
 }
 
@@ -74,13 +92,27 @@ func init() {
 	SecretCmd.AddCommand(secretCreateCmd)
 	secretCreateCmd.Flags().StringVarP(&inputPropertiesfile, "from-file", "f", "", "Path to the properties file which contains secrets to be encrypted")
 	secretCreateCmd.Flags().StringVarP(&outputType, "output", "o", "console", "Get the output in yaml (k8) or properties (file) format. By default the output is printed to the console")
-	secretCreateCmd.Flags().StringVarP(&encryptionAlgorithm, "cipher", "c", "RSA/ECB/OAEPWithSHA1AndMGF1Padding", "Encryption algorithm")
+	secretCreateCmd.Flags().StringVarP(&encryptionAlgorithm, "cipher", "c", "", "Encryption algorithm. Supports RSA/ECB/OAEPWithSHA1AndMGF1Padding, RSA/ECB/PKCS1Padding, AES/GCM/NoPadding and AES256")
 }
 
-func initSecretInformation(keyStoreConfig *utils.KeyStoreConfig) {
+func resolveCreateCipher(cmd *cobra.Command, args []string) {
+	if cmd.Flags().Changed(cipherFlagLiteral) {
+		return
+	}
+	if len(args) == 1 && args[0] == symmetricModeLiteral {
+		encryptionAlgorithm = utils.SecretEncryptionAlgorithmAESGCM
+		return
+	}
+	encryptionAlgorithm = utils.SecretEncryptionAlgorithmRSAOAEP
+}
+
+func initSecretInformation(keyStoreConfig *utils.KeyStoreConfig, encryptionKeyConfig *utils.EncryptionKeyConfig) {
 	secretConfig := utils.SecretConfig{
 		OutputType: outputType,
 		Algorithm:  encryptionAlgorithm,
+	}
+	if utils.IsAES256Encryption(secretConfig.Algorithm) {
+		secretConfig.EncryptionKey = utils.GetStoredEncryptionKey(encryptionKeyConfig)
 	}
 	if isNonEmptyString(inputPropertiesfile) {
 		secretConfig.InputType = "file"
@@ -121,11 +153,26 @@ func startConsoleForSecretInfo(secretConfig *utils.SecretConfig) {
 }
 
 func validateFlags() error {
-	if !(utils.IsOAEPEncryption(encryptionAlgorithm) || utils.IsPKCS1Encryption(encryptionAlgorithm)) {
-		return errors.New("Accepts RSA/ECB/OAEPWithSHA1AndMGF1Padding or RSA/ECB/PKCS1Padding as encryption algorithms (-c)")
+	if !(utils.IsOAEPEncryption(encryptionAlgorithm) || utils.IsPKCS1Encryption(encryptionAlgorithm) ||
+		utils.IsAES256Encryption(encryptionAlgorithm)) {
+		return errors.New("Accepts RSA/ECB/OAEPWithSHA1AndMGF1Padding, RSA/ECB/PKCS1Padding, AES/GCM/NoPadding or AES256 as encryption algorithms (-c)")
 	}
 	if !(utils.IsConsole(outputType) || utils.IsFile(outputType) || utils.IsK8(outputType)) {
 		return errors.New("Accepts k8, file or console as output formats (-o)")
+	}
+	return nil
+}
+
+func validateSymmetricModeCreateArg(cmd *cobra.Command, args []string) error {
+	if len(args) > 1 {
+		return cobra.MaximumNArgs(1)(cmd, args)
+	}
+	if len(args) == 1 && args[0] != symmetricModeLiteral {
+		return errors.New("accepts only '" + symmetricModeLiteral + "' as an optional argument")
+	}
+	if len(args) == 1 && args[0] == symmetricModeLiteral && cmd.Flags().Changed(cipherFlagLiteral) &&
+		!utils.IsAES256Encryption(encryptionAlgorithm) {
+		return errors.New("the optional argument '" + symmetricModeLiteral + "' only supports AES/GCM/NoPadding or AES256 with -c")
 	}
 	return nil
 }

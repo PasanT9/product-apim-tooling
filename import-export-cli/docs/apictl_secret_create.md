@@ -7,7 +7,7 @@ Encrypt secrets
 Create secrets based on given arguments
 
 ```
-apictl secret create [flags]
+apictl secret create [symmetric] [flags]
 ```
 
 ### Examples
@@ -15,6 +15,8 @@ apictl secret create [flags]
 ```
 To encrypt secret and get output on console
   apictl secret create
+To encrypt secret using an initialized symmetric encryption key and get output on console
+  apictl secret create symmetric
 To encrypt secret and get output as a .properties file (stored in the security folder in apictl executable directory)
   apictl secret create -o file
 To encrypt secret and get output as a .yaml file (stored in the security folder in apictl executable directory)
@@ -28,7 +30,7 @@ To bulk encrypt secrets defined in a properties file and get a .yaml file (store
 ### Options
 
 ```
-  -c, --cipher string      Encryption algorithm (default "RSA/ECB/OAEPWithSHA1AndMGF1Padding")
+  -c, --cipher string      Encryption algorithm. Supports RSA/ECB/OAEPWithSHA1AndMGF1Padding, RSA/ECB/PKCS1Padding, AES/GCM/NoPadding and AES256
   -f, --from-file string   Path to the properties file which contains secrets to be encrypted
   -h, --help               help for create
   -o, --output string      Get the output in yaml (k8) or properties (file) format. By default the output is printed to the console (default "console")

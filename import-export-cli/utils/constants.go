@@ -229,6 +229,11 @@ const APIProductId = "apiProductId"
 const DefaultCliApp = "default-apictl-app"
 const DefaultTokenType = "JWT"
 
+const SecretEncryptionAlgorithmRSAOAEP = "RSA/ECB/OAEPWithSHA1AndMGF1Padding"
+const SecretEncryptionAlgorithmRSAPKCS1 = "RSA/ECB/PKCS1Padding"
+const SecretEncryptionAlgorithmAESGCM = "AES/GCM/NoPadding"
+const SecretEncryptionAlgorithmAES256 = "AES256"
+
 const LifeCycleAction = "action"
 
 var ValidInitialStates = []string{"CREATED", "PUBLISHED"}
