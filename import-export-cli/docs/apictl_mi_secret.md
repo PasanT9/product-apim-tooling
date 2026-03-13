@@ -27,5 +27,4 @@ apictl mi secret [flags]
 
 * [apictl mi](apictl_mi.md)	 - Micro Integrator related commands
 * [apictl mi secret create](apictl_mi_secret_create.md)	 - Encrypt secrets
-* [apictl mi secret init](apictl_mi_secret_init.md)	 - Initialize keystore
-
+* [apictl mi secret init](apictl_mi_secret_init.md)	 - Initialize secret encryption

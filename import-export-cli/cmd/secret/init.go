@@ -21,6 +21,7 @@ package secret
 import (
 	"bufio"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -33,21 +34,27 @@ import (
 )
 
 const secretInitCmdLiteral = "init"
-const secretInitCmdShortDesc = "Initialize Key Store"
+const secretInitCmdShortDesc = "Initialize secret encryption"
 
-const secretInitCmdLongDesc = "Initialize the Key Store information required for secret encryption"
+const secretInitCmdLongDesc = "Initialize the keystore or symmetric encryption key required for secret encryption"
 
 var secretInitCmdExamples = "To initialize a Key Store information\n" +
-	"  " + utils.ProjectName + " " + utils.MiCmdLiteral + " " + secretCmdLiteral + " " + secretInitCmdLiteral + "\n" +
-	"NOTE: Secret encryption supports only JKS Key Stores"
+	"  " + utils.ProjectName + " " + secretCmdLiteral + " " + secretInitCmdLiteral + "\n" +
+	"To initialize a symmetric encryption key\n" +
+	"  " + utils.ProjectName + " " + secretCmdLiteral + " " + secretInitCmdLiteral + " " + symmetricModeLiteral + "\n" +
+	"NOTE: Asymmetric secret encryption supports only JKS Key Stores"
 
 var secretInitCmd = &cobra.Command{
-	Use:     secretInitCmdLiteral,
+	Use:     secretInitCmdLiteral + " [" + symmetricModeLiteral + "]",
 	Short:   secretInitCmdShortDesc,
 	Long:    secretInitCmdLongDesc,
 	Example: secretInitCmdExamples,
-	Args:    cobra.NoArgs,
+	Args:    validateSymmetricModeArg,
 	Run: func(cmd *cobra.Command, args []string) {
+		if len(args) == 1 && args[0] == symmetricModeLiteral {
+			startConsoleForEncryptionKey()
+			return
+		}
 		startConsoleForKeyStore()
 	},
 }
@@ -91,6 +98,40 @@ func startConsoleForKeyStore() {
 	} else {
 		fmt.Println("Key Store initialization failed.")
 	}
+}
+
+func startConsoleForEncryptionKey() {
+	encryptionKeyConfig := &utils.EncryptionKeyConfig{
+		Algorithm: utils.SecretEncryptionAlgorithmAESGCM,
+	}
+
+	fmt.Printf("Please enter the encryption key: ")
+	byteEncryptionKey, err := terminal.ReadPassword(int(syscall.Stdin))
+	if err != nil {
+		utils.HandleErrorAndExit("Failed to read encryption key from terminal.", err)
+	}
+	encryptionKey := strings.TrimSpace(string(byteEncryptionKey))
+	fmt.Println()
+
+	if _, err := utils.ResolveAES256Key(encryptionKey); err != nil {
+		utils.HandleErrorAndExit("Invalid encryption key.", err)
+	}
+
+	encryptionKeyConfig.EncryptionKey = base64.StdEncoding.EncodeToString([]byte(encryptionKey))
+	utils.CreateDirIfNotExist(utils.GetEncryptionKeyDirectoryPath())
+	encryptionKeyConfigFilePath := utils.GetEncryptionKeyConfigFilePath()
+	utils.WriteSensitiveConfigFile(encryptionKeyConfig, encryptionKeyConfigFilePath)
+	fmt.Println("Encryption key initialization completed.")
+}
+
+func validateSymmetricModeArg(cmd *cobra.Command, args []string) error {
+	if len(args) > 1 {
+		return cobra.MaximumNArgs(1)(cmd, args)
+	}
+	if len(args) == 1 && args[0] != symmetricModeLiteral {
+		return errors.New("accepts only '" + symmetricModeLiteral + "' as an optional argument")
+	}
+	return nil
 }
 
 func updateMap(params map[string]string, key, value string) {

@@ -749,6 +749,10 @@
         <pre><code class="lang-bash">
       Examples:
           apictl secret init
+          apictl secret init symmetric
+      Notes:
+          symmetric mode stores its key
+          asymmetric mode stores keystore details
 </code></pre>
     </li>
     <li>
@@ -760,6 +764,7 @@
               --output, -o
       Examples:
           apictl secret create
+          apictl secret create symmetric
           apictl secret create -o file
           apictl secret create -o k8
           apictl secret create -f keys.properties -o k8

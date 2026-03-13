@@ -18,7 +18,10 @@
 
 package utils
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestMD5DigestLength(t *testing.T) {
 	passwords := []string{"admin", "1234", "!@#$"}
@@ -39,6 +42,58 @@ func TestEncryptDecrypt(t *testing.T) {
 		encryptedData[i] = Encrypt(key, s)
 		if s != Decrypt(key, encryptedData[i]) {
 			t.Errorf("Encryption/Decryption does not work for '" + s + "'")
+		}
+	}
+}
+
+func TestResolveAES256Key(t *testing.T) {
+	plainTextKey := "12345678901234567890123456789012"
+	keyBytes, err := ResolveAES256Key(plainTextKey)
+	if err != nil {
+		t.Fatalf("ResolveAES256Key() returned an error for a valid plain text key: %v", err)
+	}
+	if string(keyBytes) != plainTextKey {
+		t.Fatal("ResolveAES256Key() did not preserve the plain text key bytes")
+	}
+
+	hexKey := strings.Repeat("ab", 32)
+	keyBytes, err = ResolveAES256Key(hexKey)
+	if err != nil {
+		t.Fatalf("ResolveAES256Key() returned an error for a valid hex key: %v", err)
+	}
+	if len(keyBytes) != AES256KeySize {
+		t.Fatalf("ResolveAES256Key() returned an invalid key size: %d", len(keyBytes))
+	}
+}
+
+func TestResolveAES256KeyInvalidLength(t *testing.T) {
+	_, err := ResolveAES256Key("short-key")
+	if err == nil {
+		t.Fatal("ResolveAES256Key() did not fail for an invalid key length")
+	}
+}
+
+func TestEncryptDecryptAES256(t *testing.T) {
+	data := []string{"123412", "jfal;dsjf 3214134", "a&8S4#"}
+	key, err := ResolveAES256Key("12345678901234567890123456789012")
+	if err != nil {
+		t.Fatalf("ResolveAES256Key() returned an error: %v", err)
+	}
+
+	for _, s := range data {
+		encryptedData, encryptErr := EncryptAES256(key, s)
+		if encryptErr != nil {
+			t.Fatalf("EncryptAES256() returned an error: %v", encryptErr)
+		}
+		if s == encryptedData {
+			t.Fatal("EncryptAES256() returned plain text without encryption")
+		}
+		decryptedData, decryptErr := DecryptAES256(key, encryptedData)
+		if decryptErr != nil {
+			t.Fatalf("DecryptAES256() returned an error: %v", decryptErr)
+		}
+		if s != decryptedData {
+			t.Errorf("EncryptAES256()/DecryptAES256() does not work for '%s'", s)
 		}
 	}
 }

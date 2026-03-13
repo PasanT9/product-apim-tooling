@@ -38,6 +38,8 @@ import (
 
 const keystoreDirName = "keystore"
 const keyStoreConfigFileName = "keystore_info.yaml"
+const encryptionKeyDirName = "encryption-key"
+const encryptionKeyConfigFileName = "encryption_key.yaml"
 const encryptedSecretsPropertiesFileName = "wso2-secrets.properties"
 const encryptedSecretsYamlFileName = "wso2-secrets.yaml"
 
@@ -57,6 +59,7 @@ type metaData struct {
 type SecretConfig struct {
 	OutputType          string
 	Algorithm           string
+	EncryptionKey       string
 	InputType           string
 	InputFile           string
 	PlainTextAlias      string
@@ -70,7 +73,14 @@ type KeyStoreConfig struct {
 	KeyPassword      string `yaml:"keyPassword"`
 }
 
+type EncryptionKeyConfig struct {
+	Algorithm     string `yaml:"algorithm"`
+	EncryptionKey string `yaml:"encryptionKey"`
+}
+
 type encryptFunc func(key *rsa.PublicKey, plainText string) (string, error)
+
+type symmetricEncryptFunc func(key []byte, plainText string) (string, error)
 
 // IsValidKeyStoreConfig return true if the KeyStoreConfig is valid
 func IsValidKeyStoreConfig(config *KeyStoreConfig) bool {
@@ -81,19 +91,48 @@ func IsValidKeyStoreConfig(config *KeyStoreConfig) bool {
 	return false
 }
 
-// EncryptSecrets encrypts the secrets using the keystore and write them to a file or console depending on the config map argument
-func EncryptSecrets(keyStoreConfig *KeyStoreConfig, secretConfig SecretConfig) error {
-	encryptionKey, err := getEncryptionKey(keyStoreConfig)
-	if err != nil {
-		return err
+// IsValidSymmetricEncryptionConfig returns true if the config contains a stored symmetric encryption key.
+func IsValidSymmetricEncryptionConfig(config *EncryptionKeyConfig) bool {
+	return IsAES256Encryption(config.Algorithm) && IsNonEmptyString(config.EncryptionKey)
+}
+
+// GetStoredEncryptionKey returns the decoded symmetric encryption key from the config.
+func GetStoredEncryptionKey(config *EncryptionKeyConfig) (string, error) {
+	if config == nil || !IsNonEmptyString(config.EncryptionKey) {
+		return "", errors.New("Stored encryption key is empty")
 	}
+	encryptionKey, err := base64.StdEncoding.DecodeString(config.EncryptionKey)
+	if err != nil {
+		return "", err
+	}
+	if !IsNonEmptyString(string(encryptionKey)) {
+		return "", errors.New("Stored encryption key is empty")
+	}
+	return string(encryptionKey), nil
+}
+
+// EncryptSecrets encrypts the secrets using the keystore or a direct encryption key and writes them to a file or console depending on the config map argument
+func EncryptSecrets(keyStoreConfig *KeyStoreConfig, secretConfig SecretConfig) error {
 	var encryptedSecrets map[string]string
 	plainTextSecrets := getPlainTextSecrets(secretConfig)
+	var err error
 
-	if IsPKCS1Encryption(secretConfig.Algorithm) {
-		encryptedSecrets, err = encrypt(encryptionKey, plainTextSecrets, encryptPKCS1v15)
+	if IsAES256Encryption(secretConfig.Algorithm) {
+		encryptionKey, keyErr := ResolveAES256Key(secretConfig.EncryptionKey)
+		if keyErr != nil {
+			return keyErr
+		}
+		encryptedSecrets, err = encryptSymmetric(encryptionKey, plainTextSecrets, EncryptAES256)
 	} else {
-		encryptedSecrets, err = encrypt(encryptionKey, plainTextSecrets, encryptOAEP)
+		encryptionKey, keyErr := getEncryptionKey(keyStoreConfig)
+		if keyErr != nil {
+			return keyErr
+		}
+		if IsPKCS1Encryption(secretConfig.Algorithm) {
+			encryptedSecrets, err = encrypt(encryptionKey, plainTextSecrets, encryptPKCS1v15)
+		} else {
+			encryptedSecrets, err = encrypt(encryptionKey, plainTextSecrets, encryptOAEP)
+		}
 	}
 	if err != nil {
 		return err
@@ -132,9 +171,19 @@ func GetKeyStoreDirectoryPath() string {
 	return filepath.Join(ConfigDirPath, keystoreDirName)
 }
 
+// GetEncryptionKeyDirectoryPath joins encryption-key with the config directory path
+func GetEncryptionKeyDirectoryPath() string {
+	return filepath.Join(ConfigDirPath, encryptionKeyDirName)
+}
+
 // GetKeyStoreConfigFilePath join keystore-info.yaml with the keystore path
 func GetKeyStoreConfigFilePath() string {
 	return filepath.Join(GetKeyStoreDirectoryPath(), keyStoreConfigFileName)
+}
+
+// GetEncryptionKeyConfigFilePath join encryption_key.yaml with the encryption-key path
+func GetEncryptionKeyConfigFilePath() string {
+	return filepath.Join(GetEncryptionKeyDirectoryPath(), encryptionKeyConfigFileName)
 }
 
 // GetKeyStoreConfigFromFile read and return KeyStoreConfig
@@ -149,6 +198,22 @@ func GetKeyStoreConfigFromFile(filePath string) (*KeyStoreConfig, error) {
 	}
 	if !IsValidKeyStoreConfig(config) {
 		return nil, errors.New("Missing required fields.\nExecute 'apictl secret init --help' for more information")
+	}
+	return config, nil
+}
+
+// GetEncryptionKeyConfigFromFile read and return EncryptionKeyConfig
+func GetEncryptionKeyConfigFromFile(filePath string) (*EncryptionKeyConfig, error) {
+	data, err := ioutil.ReadFile(filePath)
+	if err != nil {
+		return nil, errors.New("Config file not found.\nExecute 'apictl secret init symmetric --help' for more information")
+	}
+	config := &EncryptionKeyConfig{}
+	if err := yaml.Unmarshal(data, config); err != nil {
+		return nil, errors.New("Parsing error.\nExecute 'apictl secret init symmetric --help' for more information")
+	}
+	if !IsValidSymmetricEncryptionConfig(config) {
+		return nil, errors.New("Missing required fields.\nExecute 'apictl secret init symmetric --help' for more information")
 	}
 	return config, nil
 }
@@ -175,6 +240,19 @@ func getEncryptionKey(keyStoreConfig *KeyStoreConfig) (*rsa.PublicKey, error) {
 }
 
 func encrypt(encryptionKey *rsa.PublicKey, plainTextSecrets map[string]string, encryptFunction encryptFunc) (map[string]string, error) {
+	var encryptedSecrets = make(map[string]string)
+	for alias, plainText := range plainTextSecrets {
+		encryptedSecret, err := encryptFunction(encryptionKey, plainText)
+		if err != nil {
+			return nil, err
+		}
+		encryptedSecrets[alias] = encryptedSecret
+	}
+	return encryptedSecrets, nil
+}
+
+func encryptSymmetric(encryptionKey []byte, plainTextSecrets map[string]string,
+	encryptFunction symmetricEncryptFunc) (map[string]string, error) {
 	var encryptedSecrets = make(map[string]string)
 	for alias, plainText := range plainTextSecrets {
 		encryptedSecret, err := encryptFunction(encryptionKey, plainText)
@@ -215,7 +293,7 @@ func printSecretsToYamlFile(secrets map[string]string) {
 		StringData: secrets,
 		Type:       "Opaque",
 		MetaData: metaData{
-			Name:      "wso2secret",
+			Name: "wso2secret",
 		},
 	}
 	secretFilePath := getSecretFilePath(encryptedSecretsYamlFileName)
@@ -285,6 +363,12 @@ func IsPKCS1Encryption(algorithm string) bool {
 // IsOAEPEncryption return true if the encryption algorithm is RSA/ECB/OAEPWithSHA1AndMGF1Padding
 func IsOAEPEncryption(algorithm string) bool {
 	return strings.EqualFold(algorithm, "RSA/ECB/OAEPWithSHA1AndMGF1Padding")
+}
+
+// IsAES256Encryption return true if the encryption algorithm uses AES-256 GCM.
+func IsAES256Encryption(algorithm string) bool {
+	return strings.EqualFold(algorithm, SecretEncryptionAlgorithmAESGCM) ||
+		strings.EqualFold(algorithm, SecretEncryptionAlgorithmAES256)
 }
 
 // IsNonEmptyString return true if the passed string is non empty
