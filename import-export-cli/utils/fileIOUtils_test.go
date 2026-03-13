@@ -85,6 +85,21 @@ func TestWriteConfigFile(t *testing.T) {
 	}
 }
 
+func TestWriteSensitiveConfigFile(t *testing.T) {
+	tempDir := t.TempDir()
+	configFilePath := filepath.Join(tempDir, "sensitive_config.yaml")
+
+	WriteSensitiveConfigFile(envKeysAll, configFilePath)
+
+	fileInfo, err := os.Stat(configFilePath)
+	if err != nil {
+		t.Fatalf("Stat() returned an error: %v", err)
+	}
+	if fileInfo.Mode().Perm() != 0600 {
+		t.Fatalf("expected file permissions %v, got %v", os.FileMode(0600), fileInfo.Mode().Perm())
+	}
+}
+
 func TestGetEnvKeysAllFromFile1(t *testing.T) {
 	writeCorrectKeys()
 	envKeysAllReturned := GetEnvKeysAllFromFile(testKeysFilePath)

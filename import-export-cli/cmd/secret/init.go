@@ -120,7 +120,7 @@ func startConsoleForEncryptionKey() {
 	encryptionKeyConfig.EncryptionKey = base64.StdEncoding.EncodeToString([]byte(encryptionKey))
 	utils.CreateDirIfNotExist(utils.GetEncryptionKeyDirectoryPath())
 	encryptionKeyConfigFilePath := utils.GetEncryptionKeyConfigFilePath()
-	utils.WriteConfigFile(encryptionKeyConfig, encryptionKeyConfigFilePath)
+	utils.WriteSensitiveConfigFile(encryptionKeyConfig, encryptionKeyConfigFilePath)
 	fmt.Println("Encryption key initialization completed.")
 }
 

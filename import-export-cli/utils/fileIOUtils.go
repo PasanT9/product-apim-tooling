@@ -37,12 +37,21 @@ import (
 // @param c : data
 // @param envConfigFilePath : Path to file where env endpoints are stored
 func WriteConfigFile(c interface{}, configFilePath string) {
+	writeConfigFile(c, configFilePath, 0644)
+}
+
+// WriteSensitiveConfigFile writes config data with owner-only permissions.
+func WriteSensitiveConfigFile(c interface{}, configFilePath string) {
+	writeConfigFile(c, configFilePath, 0600)
+}
+
+func writeConfigFile(c interface{}, configFilePath string, mode os.FileMode) {
 	data, err := yaml.Marshal(&c)
 	if err != nil {
 		HandleErrorAndExit("Unable to write configuration to file.", err)
 	}
 
-	err = ioutil.WriteFile(configFilePath, data, 0644)
+	err = ioutil.WriteFile(configFilePath, data, mode)
 	if err != nil {
 		HandleErrorAndExit("Unable to write configuration to file.", err)
 	}
