@@ -48,10 +48,17 @@ func TestSecretCreateSymmetricUsesInitializedEncryptionKey(t *testing.T) {
 	oldInputPropertiesFile := inputPropertiesfile
 	oldEncryptionAlgorithm := encryptionAlgorithm
 	oldOutputType := outputType
+
+	cipherFlag := secretCreateCmd.Flags().Lookup(cipherFlagLiteral)
+	if cipherFlag == nil {
+		t.Fatalf("expected %q flag to be registered on secretCreateCmd", cipherFlagLiteral)
+	}
+	oldCipherFlagChanged := cipherFlag.Changed
 	defer func() {
 		inputPropertiesfile = oldInputPropertiesFile
 		encryptionAlgorithm = oldEncryptionAlgorithm
 		outputType = oldOutputType
+		cipherFlag.Changed = oldCipherFlagChanged
 	}()
 
 	plainTextKey := "12345678901234567890123456789012"
@@ -70,7 +77,7 @@ func TestSecretCreateSymmetricUsesInitializedEncryptionKey(t *testing.T) {
 	inputPropertiesfile = propertiesFilePath
 	outputType = "file"
 	encryptionAlgorithm = ""
-	secretCreateCmd.Flags().Lookup(cipherFlagLiteral).Changed = false
+	cipherFlag.Changed = false
 	if err = validateSymmetricModeCreateArg(secretCreateCmd, []string{symmetricModeLiteral}); err != nil {
 		t.Fatalf("validateSymmetricModeCreateArg() returned an error: %v", err)
 	}

@@ -106,7 +106,10 @@ func startConsoleForEncryptionKey() {
 	}
 
 	fmt.Printf("Please enter the encryption key: ")
-	byteEncryptionKey, _ := terminal.ReadPassword(int(syscall.Stdin))
+	byteEncryptionKey, err := terminal.ReadPassword(int(syscall.Stdin))
+	if err != nil {
+		utils.HandleErrorAndExit("Failed to read encryption key from terminal.", err)
+	}
 	encryptionKey := strings.TrimSpace(string(byteEncryptionKey))
 	fmt.Println()
 
