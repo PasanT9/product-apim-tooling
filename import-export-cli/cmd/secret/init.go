@@ -36,7 +36,7 @@ import (
 const secretInitCmdLiteral = "init"
 const secretInitCmdShortDesc = "Initialize secret encryption"
 
-const secretInitCmdLongDesc = "Initialize the key store or symmetric encryption key required for secret encryption"
+const secretInitCmdLongDesc = "Initialize the keystore or symmetric encryption key required for secret encryption"
 
 var secretInitCmdExamples = "To initialize a Key Store information\n" +
 	"  " + utils.ProjectName + " " + secretCmdLiteral + " " + secretInitCmdLiteral + "\n" +

@@ -4,7 +4,7 @@ Initialize secret encryption
 
 ### Synopsis
 
-Initialize the key store or symmetric encryption key required for secret encryption
+Initialize the keystore or symmetric encryption key required for secret encryption
 
 ```
 apictl mi secret init [symmetric] [flags]
