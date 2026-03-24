@@ -1568,6 +1568,7 @@ func TestDeleteApiWithActiveSubscriptionsSuperTenantUser(t *testing.T) {
 	}
 	//Publish created API
 	testutils.PublishAPI(dev, apiPublisher, apiPublisherPassword, api.ID)
+	base.WaitForIndexing()
 
 	testutils.ValidateGetKeysWithoutCleanup(t, args, false)
 	//args to delete API
